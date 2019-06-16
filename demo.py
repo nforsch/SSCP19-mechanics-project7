@@ -3,6 +3,7 @@ import numpy as np
 import dolfin as df
 import pulse
 import ldrb
+import matplotlib.pyplot as plt
 
 
 def create_geometry(h5name):
@@ -109,11 +110,78 @@ def save_geometry_vis(geometry, folder='geometry'):
                            '{}/{}'.format(folder, attr))
 
 
-def postprocess():
-    pass
+def get_strains(u, v, dx):
+
+    F = pulse.kinematics.DeformationGradient(u)
+    E = pulse.kinematics.GreenLagrangeStrain(F, isochoric=False)
+    
+    return df.assemble(df.inner(E*v, v) * dx) \
+        / df.assemble(df.Constant(1.0) * dx)
 
 
-def main(
+def get_nodal_coordinates(u):
+
+    mesh = df.Mesh(u.function_space().mesh())
+    V = df.VectorFunctionSpace(mesh, "CG", 1)
+    df.ALE.move(mesh, df.interpolate(u, V))
+    return mesh.coordinates()
+
+
+def postprocess(geometry):
+    """
+    Get strain at nodal values
+
+    Arguments
+    ---------
+    filename : str
+        Filname where to store the results
+    """
+
+    coords = [geometry.mesh.coordinates()]
+    V = df.VectorFunctionSpace(geometry.mesh, "CG", 2)
+    Ef = np.zeros((3, 17))
+
+    u_ED = df.Function(V, "ED_displacement.xml")
+    coords.append(get_nodal_coordinates(u_ED))
+    for i in range(17):
+        Ef[1, i] = get_strains(u_ED, geometry.f0, geometry.dx(i+1))
+    EDV = geometry.cavity_volume(u=u_ED)
+    
+    u_ES = df.Function(V, "ES_displacement.xml")
+    coords.append(get_nodal_coordinates(u_ES))
+    for i in range(17):
+        Ef[2, i] = get_strains(u_ES, geometry.f0, geometry.dx(i+1))
+    ESV = geometry.cavity_volume(u=u_ES)
+    # Stroke volume
+    SV = EDV - ESV
+    # Ejection fraction
+    EF = SV / EDV
+
+    print(("EDV: {EDV:.2f} ml\nESV: {ESV:.2f} ml\nSV: {SV:.2f}"
+           " ml\nEF: {EF:.2f}").format(EDV=EDV, ESV=ESV, SV=SV, EF=EF))
+
+    fig, ax = plt.subplots(1, 3, sharex=True, sharey=True)
+    for i in range(17):
+        j = i // 6
+        # from IPython import embed; embed()
+        # exit()
+        ax[j].plot(Ef[:, i], label="region {}".format(i+1))
+
+    ax[0].set_title("Basal")
+    ax[1].set_title("Mid")
+    ax[2].set_title("Apical")
+
+    ax[0].set_ylabel("Fiber strain")
+    for axi in ax:
+        axi.set_xticks(range(3))
+        axi.set_xticklabels(["", "ED", "ES"])
+        axi.legend()
+    
+    plt.show()
+    
+
+def solve(
+        geometry,
         EDP=1.0,
         ESP=5.0,
         Ta=60,
@@ -132,12 +200,10 @@ def main(
     material_parameters : dict
         A dictionart with parameter in the Guccione model.
         Default:  {'C': 2.0, 'bf': 8.0, 'bt': 2.0, 'bfs': 4.0}
+    filename : str
+        Filname where to store the results
 
     """
-
-    geometry = load_geometry()
-    # save_geometry_vis(geo)
-
     # Create model
     activation = df.Function(df.FunctionSpace(geometry.mesh, "R", 0))
     matparams = pulse.Guccione.default_parameters()
@@ -180,7 +246,7 @@ def main(
     # Create the problem
     problem = pulse.MechanicsProblem(geometry, material, bcs)
 
-    xdmf = df.XDMFFile(df.mpi_comm_world(), 'output1.xdmf')
+    xdmf = df.XDMFFile(df.mpi_comm_world(), 'output.xdmf')
     
     # Solve the problem
     print(("Do an initial solve with pressure = 0 kPa "
@@ -198,8 +264,9 @@ def main(
            "".format(EDP)))
     pulse.iterate.iterate(problem, lvp, EDP)
     
-    u, p = problem.state.split()
+    u, p = problem.state.split(deepcopy=True)
     xdmf.write(u, 1.0)
+    df.File("ED_displacement.xml") << u
     print("LV cavity volume = {} ml".format(geometry.cavity_volume(u=u)))
     # Solve for ES
 
@@ -208,17 +275,26 @@ def main(
     # Peak active tension (at ES)
     Ta = 60
 
-    print(("Solver for ED with pressure = {} kPa and active tension = {} kPa"
+    print(("Solver for ES with pressure = {} kPa and active tension = {} kPa"
            "".format(ESP, Ta)))
     pulse.iterate.iterate(problem, lvp, ESP, initial_number_of_steps=20)
     pulse.iterate.iterate(problem, activation, Ta, initial_number_of_steps=20)
         
-    u, p = problem.state.split()
+    u, p = problem.state.split(deepcopy=True)
     xdmf.write(u, 2.0)
+    df.File("ES_displacement.xml") << u
     print("LV cavity volume = {} ml".format(geometry.cavity_volume(u=u)))
 
 
-
+def main():
+    geometry = load_geometry()
+    # save_geometry_vis(geometry)
+    # solve(geometry,
+    #       EDP=1.0,
+    #       ESP=5.0,
+    #       Ta=60,
+    #       material_parameters=None)
+    postprocess(geometry)
     
 
 
@@ -226,3 +302,4 @@ def main(
     
 if __name__ == "__main__":
     main()
+
