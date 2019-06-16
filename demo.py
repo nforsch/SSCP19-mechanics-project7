@@ -109,7 +109,31 @@ def save_geometry_vis(geometry, folder='geometry'):
                            '{}/{}'.format(folder, attr))
 
 
-def main():
+def postprocess():
+    pass
+
+
+def main(
+        EDP=1.0,
+        ESP=5.0,
+        Ta=60,
+        material_parameters=None,
+):
+    """
+    
+    Arguments
+    ---------
+    EDP : float
+        End diastolic pressure
+    ESP : float
+        End systolic pressure
+    Ta : float
+        Peak active tension (at ES)
+    material_parameters : dict
+        A dictionart with parameter in the Guccione model.
+        Default:  {'C': 2.0, 'bf': 8.0, 'bt': 2.0, 'bfs': 4.0}
+
+    """
 
     geometry = load_geometry()
     # save_geometry_vis(geo)
@@ -117,6 +141,8 @@ def main():
     # Create model
     activation = df.Function(df.FunctionSpace(geometry.mesh, "R", 0))
     matparams = pulse.Guccione.default_parameters()
+    if material_parameters is not None:
+        matparams.update(material_parameters)
     material = pulse.Guccione(activation=activation,
                               parameters=matparams,
                               active_model="active_stress",
@@ -167,7 +193,7 @@ def main():
     # Solve for ED
 
     # End diastolic pressure
-    EDP = 1.0  # kPa
+    
     print(("Solver for ED with pressure = {} kPa and active tension = 0 kPa"
            "".format(EDP)))
     pulse.iterate.iterate(problem, lvp, EDP)
