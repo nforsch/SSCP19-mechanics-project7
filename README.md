@@ -18,3 +18,9 @@ your workflow.
 ### Requirements for LHS
 pyDOE
 scipy
+
+### Requirements for PCA
+matplotlib
+sklearn
+numpy
+seaborn
