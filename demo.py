@@ -114,7 +114,7 @@ def get_strains(u, v, dx):
 
     F = pulse.kinematics.DeformationGradient(u)
     E = pulse.kinematics.GreenLagrangeStrain(F, isochoric=False)
-    
+
     return df.assemble(df.inner(E*v, v) * dx) \
         / df.assemble(df.Constant(1.0) * dx)
 
@@ -146,7 +146,7 @@ def postprocess(geometry):
     for i in range(17):
         Ef[1, i] = get_strains(u_ED, geometry.f0, geometry.dx(i+1))
     EDV = geometry.cavity_volume(u=u_ED)
-    
+
     u_ES = df.Function(V, "ES_displacement.xml")
     coords.append(get_nodal_coordinates(u_ES))
     for i in range(17):
@@ -156,9 +156,12 @@ def postprocess(geometry):
     SV = EDV - ESV
     # Ejection fraction
     EF = SV / EDV
-
     print(("EDV: {EDV:.2f} ml\nESV: {ESV:.2f} ml\nSV: {SV:.2f}"
            " ml\nEF: {EF:.2f}").format(EDV=EDV, ESV=ESV, SV=SV, EF=EF))
+
+    # Save nodes as txt at ED and ES
+    np.savetxt('coords_ED.txt',coords[1],fmt='%.4f',delimiter=',')
+    np.savetxt('coords_ES.txt',coords[2],fmt='%.4f',delimiter=',')
 
     fig, ax = plt.subplots(1, 3, sharex=True, sharey=True)
     for i in range(17):
@@ -176,19 +179,19 @@ def postprocess(geometry):
         axi.set_xticks(range(3))
         axi.set_xticklabels(["", "ED", "ES"])
         axi.legend()
-    
+
     plt.show()
-    
+
 
 def solve(
         geometry,
         EDP=1.0,
-        ESP=5.0,
+        ESP=15.0,
         Ta=60,
         material_parameters=None,
 ):
     """
-    
+
     Arguments
     ---------
     EDP : float
@@ -221,7 +224,7 @@ def solve(
     lv_pressure = pulse.NeumannBC(traction=lvp,
                                   marker=lv_marker, name='lv')
     neumann_bc = [lv_pressure]
-    
+
     # Add spring term at the base with stiffness 1.0 kPa/cm^2
     base_spring = 1.0
     robin_bc = [pulse.RobinBC(value=df.Constant(base_spring),
@@ -247,7 +250,7 @@ def solve(
     problem = pulse.MechanicsProblem(geometry, material, bcs)
 
     xdmf = df.XDMFFile(df.mpi_comm_world(), 'output.xdmf')
-    
+
     # Solve the problem
     print(("Do an initial solve with pressure = 0 kPa "
           "and active tension = 0 kPa"))
@@ -255,31 +258,23 @@ def solve(
     u, p = problem.state.split()
     xdmf.write(u, 0.0)
     print("LV cavity volume = {} ml".format(geometry.cavity_volume(u=u)))
-    
-    # Solve for ED
 
-    # End diastolic pressure
-    
+    # Solve for ED
     print(("Solver for ED with pressure = {} kPa and active tension = 0 kPa"
            "".format(EDP)))
     pulse.iterate.iterate(problem, lvp, EDP)
-    
+
     u, p = problem.state.split(deepcopy=True)
     xdmf.write(u, 1.0)
     df.File("ED_displacement.xml") << u
     print("LV cavity volume = {} ml".format(geometry.cavity_volume(u=u)))
+
     # Solve for ES
-
-    # End systolic pressure
-    ESP = 15.0   # kPa
-    # Peak active tension (at ES)
-    Ta = 60
-
     print(("Solver for ES with pressure = {} kPa and active tension = {} kPa"
            "".format(ESP, Ta)))
     pulse.iterate.iterate(problem, lvp, ESP, initial_number_of_steps=20)
     pulse.iterate.iterate(problem, activation, Ta, initial_number_of_steps=20)
-        
+
     u, p = problem.state.split(deepcopy=True)
     xdmf.write(u, 2.0)
     df.File("ES_displacement.xml") << u
@@ -287,19 +282,18 @@ def solve(
 
 
 def main():
-    geometry = load_geometry()
-    # save_geometry_vis(geometry)
-    # solve(geometry,
-    #       EDP=1.0,
-    #       ESP=5.0,
-    #       Ta=60,
-    #       material_parameters=None)
+    geometry = load_geometry(recreate=True)
+    save_geometry_vis(geometry)
+    solve(geometry,
+          EDP=1.0,
+          ESP=15.0,
+          Ta=60,
+          material_parameters=None)
     postprocess(geometry)
-    
 
 
 
-    
+
+
 if __name__ == "__main__":
     main()
-
