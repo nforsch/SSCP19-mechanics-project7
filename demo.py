@@ -78,7 +78,8 @@ def create_geometry(h5name):
 
     pulse.geometry_utils.save_geometry_to_h5(
         geometry.mesh, h5name, markers=m,
-        fields=[fiber, sheet, sheet_normal]
+        fields=[fiber, sheet, sheet_normal],
+        overwrite_file=True
     )
 
 
