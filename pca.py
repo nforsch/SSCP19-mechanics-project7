@@ -29,3 +29,10 @@ sample_weights = pca.transform(X_sample)
 X_recreate = pca.mean_ + sample_weights.dot(pca.components_)
 # OR
 # X_recreate = pca.inverse_transform(sample_weights)
+
+# Plot explained variance per PC and cumulative
+var_ratio = pca.explained_variance_ratio_
+cumsum_var = np.cumsum(var_ratio)
+plt.figure(figsize=(8, 6))
+plt.bar(range(1,21), var_ratio.values.flatten(), color='r',alpha=0.5, align='center', label='individual explained variance')
+plt.step(range(1,21), cumsum_var.values.flatten(), where='mid', label='cumulative explained variance')
