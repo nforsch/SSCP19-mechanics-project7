@@ -286,8 +286,8 @@ def solve(
 
 
 def main():
-    geometry = load_geometry(recreate=True)
-    save_geometry_vis(geometry)
+    geometry = load_geometry(h5name='ellipsoid.h5', recreate=True)
+    save_geometry_vis(geometry, folder='geometry')
     # solve(geometry,
     #       EDP=1.0,
     #       ESP=15.0,
