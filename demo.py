@@ -71,7 +71,10 @@ def create_geometry(h5name):
     # Compute focal point
     focal = np.sqrt(a_endo**2 - (0.5 * (b_endo + c_endo))**2)
     # Make mesh according to AHA-zons
-    pulse.geometry_utils.mark_strain_regions(mesh=geometry.mesh, foc=focal)
+    # pulse.geometry_utils.mark_strain_regions(mesh=geometry.mesh, foc=focal)
+    pulse.geometry_utils.mark_strain_regions(mesh=geometry.mesh,
+                                             foc=focal,
+                                             nsectors=(15, 15, 15, 5))
 
     mapper = {'lv': 'ENDO', 'epi': 'EPI', 'rv': 'ENDO_RV', 'base': 'BASE'}
     m = {mapper[k]: (v, 2) for k, v in geometry.markers.items()}
@@ -285,12 +288,12 @@ def solve(
 def main():
     geometry = load_geometry(recreate=True)
     save_geometry_vis(geometry)
-    solve(geometry,
-          EDP=1.0,
-          ESP=15.0,
-          Ta=60,
-          material_parameters=None)
-    postprocess(geometry)
+    # solve(geometry,
+    #       EDP=1.0,
+    #       ESP=15.0,
+    #       Ta=60,
+    #       material_parameters=None)
+    # postprocess(geometry)
 
 
 
