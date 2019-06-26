@@ -289,8 +289,9 @@ def solve(
 
 
 def main():
-    geometry = load_geometry()
-    save_geometry_vis(geometry)
+
+    geometry = load_geometry(h5name='ellipsoid.h5', recreate=True)
+    save_geometry_vis(geometry, folder='geometry')
     import time
     t0 = time.time()
     solve(geometry,
@@ -301,8 +302,6 @@ def main():
     t1 = time.time()
     print('Elapsed time = {:.2f} seconds'.format(t1 - t0))
     postprocess(geometry)
-
-
 
 
 
