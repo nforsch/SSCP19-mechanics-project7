@@ -266,7 +266,7 @@ def solve(
     # Solve for ED
     print(("Solver for ED with pressure = {} kPa and active tension = 0 kPa"
            "".format(EDP)))
-    pulse.iterate.iterate(problem, lvp, EDP)
+    pulse.iterate.iterate(problem, lvp, EDP, initial_number_of_steps=20)
 
     u, p = problem.state.split(deepcopy=True)
     xdmf.write(u, 1.0)
@@ -276,8 +276,11 @@ def solve(
     # Solve for ES
     print(("Solver for ES with pressure = {} kPa and active tension = {} kPa"
            "".format(ESP, Ta)))
-    pulse.iterate.iterate(problem, lvp, ESP, initial_number_of_steps=20)
-    pulse.iterate.iterate(problem, activation, Ta, initial_number_of_steps=20)
+    pulse.iterate.iterate(problem, lvp, ESP,
+                          initial_number_of_steps=50)
+    pulse.iterate.iterate(problem, activation, Ta,
+                          adapt_step=False, max_iters=100,
+                          initial_number_of_steps=40)
 
     u, p = problem.state.split(deepcopy=True)
     xdmf.write(u, 2.0)
@@ -286,14 +289,18 @@ def solve(
 
 
 def main():
-    geometry = load_geometry(recreate=True)
+    geometry = load_geometry()
     save_geometry_vis(geometry)
-    # solve(geometry,
-    #       EDP=1.0,
-    #       ESP=15.0,
-    #       Ta=60,
-    #       material_parameters=None)
-    # postprocess(geometry)
+    import time
+    t0 = time.time()
+    solve(geometry,
+          EDP=1.0,
+          ESP=15.0,
+          Ta=60,
+          material_parameters=None)
+    t1 = time.time()
+    print('Elapsed time = {:.2f} seconds'.format(t1 - t0))
+    postprocess(geometry)
 
 
 
